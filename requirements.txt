@@ -1,0 +1,10 @@
+azure-functions
+azure-identity
+azure-mgmt-resourcegraph
+azure-mgmt-monitor
+azure-mgmt-compute
+azure-mgmt-network
+azure-mgmt-rdbms
+azure-storage-blob
+jinja2
+requests
