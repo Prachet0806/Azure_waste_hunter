@@ -1,0 +1,27 @@
+[project]
+name = "azure-waste-hunter"
+version = "0.1.0"
+requires-python = ">=3.12,<3.13"
+
+[tool.ruff]
+target-version = "py312"
+line-length = 110
+exclude = [".git", ".venv", ".terraform"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I"]
+ignore = ["E501"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"
+
+[tool.coverage.run]
+branch = true
+source = ["function_app", "scanner", "enrichment", "cost_engine", "shared", "delivery", "compliance", "reporting", "observability"]
+omit = ["*/__init__.py"]
+
+[tool.coverage.report]
+fail_under = 80
+show_missing = true
+skip_covered = true

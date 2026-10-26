@@ -6,9 +6,14 @@ terraform {
       source  = "hashicorp/azurerm"
       version = "~> 3.90"
     }
+    random = {
+      source  = "hashicorp/random"
+      version = "~> 3.6"
+    }
   }
 }
 
 provider "azurerm" {
   features {}
+  subscription_id = var.subscription_id
 }

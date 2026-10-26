@@ -1,3 +1,4 @@
 def enrich_disk(disk):
-    disk["idle"] = True  # unattached disks are always wasted
+    disk["assessment_status"] = "candidate"
+    disk["assessment_reason"] = "Disk is unattached; verify retention and recovery requirements before action."
     return disk

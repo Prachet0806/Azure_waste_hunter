@@ -1,4 +1,15 @@
 .env
 .venv
+.venv*/
 __pycache__/
 __pytest_cache__/
+.pytest_cache/
+.coverage
+htmlcov/
+coverage.xml
+.terraform/
+*.tfstate
+*.tfstate.*
+crash.log
+crash.*.log
+*.tfplan

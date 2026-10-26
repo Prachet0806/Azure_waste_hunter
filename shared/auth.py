@@ -1,4 +1,5 @@
 import os
+
 from azure.identity import DefaultAzureCredential
 
 _credential = None
@@ -9,7 +10,10 @@ def get_credential():
         _credential = DefaultAzureCredential()
     return _credential
 
-def get_subscription_id():
+def get_subscription_id(resource=None):
+    """Return the resource's subscription, falling back to explicit config."""
+    if resource and resource.get("subscriptionId"):
+        return resource["subscriptionId"]
     sub = os.environ.get("AZURE_SUBSCRIPTION_ID")
     if not sub:
         subs = os.environ.get("AZURE_SUBSCRIPTIONS", "")

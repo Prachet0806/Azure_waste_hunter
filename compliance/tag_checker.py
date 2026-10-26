@@ -1,10 +1,18 @@
-# compliance/tag_checker.py
-REQUIRED_TAGS = ["owner", "env", "cost-center"]
+"""Tag presence and basic value validation; policy-specific checks stay explicit."""
 
-def check_tags(resource: dict) -> list[str]:
-    """
-    Returns a list of missing required tags for a resource.
-    Empty list means compliant.
-    """
-    tags = resource.get("tags", {}) or {}
-    return [t for t in REQUIRED_TAGS if t not in tags]
+REQUIRED_TAGS = ("owner", "env", "cost-center")
+
+
+def check_tags(resource: dict) -> dict:
+    raw_tags = resource.get("tags")
+    if raw_tags is not None and not isinstance(raw_tags, dict):
+        return {"status": "unassessed", "violations": [], "reason": "Tag payload was not an object."}
+    tags = {str(key).strip().casefold(): value for key, value in (raw_tags or {}).items()}
+    violations = []
+    for required in REQUIRED_TAGS:
+        value = tags.get(required)
+        if value is None:
+            violations.append(f"{required}:missing")
+        elif not isinstance(value, str) or not value.strip():
+            violations.append(f"{required}:invalid")
+    return {"status": "violations" if violations else "compliant", "violations": violations, "reason": None}
