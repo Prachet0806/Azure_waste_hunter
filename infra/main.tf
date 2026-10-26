@@ -9,13 +9,35 @@ locals {
 
 # Storage for reports
 resource "azurerm_storage_account" "storage" {
+  # The Y1 Consumption plan has no VNet integration, so this workload cannot
+  # use storage private endpoints or disable storage public-network access yet.
+  # Reports remain in a private container; report SDK access uses TLS and the
+  # Function's managed identity. The platform host/content path still uses key auth.
+  #checkov:skip=CKV_AZURE_59: Y1 Consumption has no VNet integration; blobs are private and app data access uses managed identity.
+  #checkov:skip=CKV2_AZURE_33: Y1 Consumption has no VNet integration to route storage traffic through a private endpoint.
+  #checkov:skip=CKV2_AZURE_40: Azure Functions Consumption content storage still uses its platform storage key; report SDK access uses managed identity.
+  #checkov:skip=CKV2_AZURE_1: This pilot stores operational inventory reports; customer-managed keys require a separately operated Key Vault and key lifecycle.
   name                            = "wastehunter${random_integer.rand.result}"
   resource_group_name             = azurerm_resource_group.rg.name
   location                        = var.location
   account_tier                    = "Standard"
-  account_replication_type        = "LRS"
+  account_replication_type        = "GRS"
   min_tls_version                 = "TLS1_2"
   allow_nested_items_to_be_public = false
+  shared_access_key_enabled       = true
+  sas_policy {
+    expiration_period = "7.00:00:00"
+    expiration_action = "Log"
+  }
+  queue_properties {
+    logging {
+      delete                = true
+      read                  = true
+      write                 = true
+      version               = "1.0"
+      retention_policy_days = 7
+    }
+  }
   blob_properties {
     delete_retention_policy {
       days = 30
@@ -49,9 +71,29 @@ resource "random_integer" "rand" {
 }
 
 resource "azurerm_storage_container" "reports" {
+  # Blob read/write/delete logging is sent to Log Analytics by the diagnostic
+  # setting below. Checkov's graph rule only recognizes the legacy storage
+  # insights resource, not this current diagnostic-settings configuration.
+  #checkov:skip=CKV2_AZURE_21: Blob service categories are enabled with azurerm_monitor_diagnostic_setting below; Checkov only recognizes the legacy insights resource.
   name                  = "waste-reports"
   storage_account_name  = azurerm_storage_account.storage.name
   container_access_type = "private"
+}
+
+resource "azurerm_monitor_diagnostic_setting" "report_blob" {
+  name                       = "report-blob-logs"
+  target_resource_id         = "${azurerm_storage_account.storage.id}/blobServices/default"
+  log_analytics_workspace_id = azurerm_log_analytics_workspace.law.id
+
+  enabled_log {
+    category = "StorageRead"
+  }
+  enabled_log {
+    category = "StorageWrite"
+  }
+  enabled_log {
+    category = "StorageDelete"
+  }
 }
 
 # Log Analytics + App Insights
@@ -73,11 +115,12 @@ resource "azurerm_application_insights" "ai" {
 
 # Function App
 resource "azurerm_linux_function_app" "func" {
-  name                = "azure-waste-hunter-fn"
-  location            = var.location
-  resource_group_name = azurerm_resource_group.rg.name
-  service_plan_id     = azurerm_service_plan.plan.id
-  https_only          = true
+  name                          = "azure-waste-hunter-fn"
+  location                      = var.location
+  resource_group_name           = azurerm_resource_group.rg.name
+  service_plan_id               = azurerm_service_plan.plan.id
+  https_only                    = true
+  public_network_access_enabled = false
 
   identity {
     type = "SystemAssigned"
@@ -124,6 +167,10 @@ resource "azurerm_role_assignment" "report_blob_writer" {
 }
 
 resource "azurerm_service_plan" "plan" {
+  # Zone redundancy and a minimum always-ready instance are not available on
+  # the Y1 serverless Consumption SKU; retain the low-cost scale-to-zero plan.
+  #checkov:skip=CKV_AZURE_225: Y1 Consumption does not support zone-redundant App Service plans.
+  #checkov:skip=CKV_AZURE_212: Y1 Consumption scales to zero and does not expose a minimum instance count.
   name                = "waste-hunter-plan"
   location            = var.location
   resource_group_name = azurerm_resource_group.rg.name
